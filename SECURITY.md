@@ -3,6 +3,8 @@
 This is an experimental policy gate, not an adversarially proven reference monitor.
 
 - Shell parsing is deliberately limited and executable behavior is not attested.
+  General-development and production-safe permit scripts and build tools to reach
+  Jev even without their source. Only strict-execution blocks them categorically.
   Shell startup files, PATH resolution, Git helpers/configuration, symlink races and
   persistent sessions can change an operation's effects after evaluation.
 - Tool hooks are not filesystem/syscall hooks. A permitted program may read files

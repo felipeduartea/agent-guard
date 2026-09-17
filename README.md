@@ -9,20 +9,26 @@ file access, existing terminal input, hosted tool or subprocess. Jev can make an
 incorrect decision. Use read-only production credentials and an OS sandbox for
 stronger enforcement.
 
-## What it blocks
+## Choose a policy
 
-- Production mutations and remote writes with an unknown target environment.
-- Login, logout and identity changes, including `gcloud auth login`, application-default
-  login, AWS SSO, Azure login and similar operations.
-- Known destructive commands and edits to system, credential and guard paths.
-- Opaque execution: Python, Node, shell scripts, npm, make, raw database/HTTP clients,
-  and similar tools whose effects the hook cannot inspect.
-- Actions Jev rejects or considers uncertain, plus handled API/key/runtime errors.
+New installations default to **general-development**. Every preset includes a baseline
+against system destruction, credential exposure and guard tampering. Passing fixed checks
+still requires Jev evaluation and the agent's normal permissions.
 
-The opaque-execution restriction is intentionally broad and **will interrupt normal
-development workflows**, including tests and builds. This is a conservative starting
-policy, not a transparent drop-in security product. Supported local reads and edits
-remain eligible for Jev review.
+| Preset | Optional restrictions included | Ordinary Python/npm/make |
+| --- | --- | --- |
+| `general-development` (default) | None | Eligible for Jev review |
+| `production-safe` | Production read-only; no authentication changes | Eligible for Jev review |
+| `strict` | Production read-only; no authentication changes; strict execution | Blocked |
+
+Packs are additive: `production-read-only`, `no-auth-changes`, `strict-execution`,
+and `protected-paths`. The baseline always applies. Configurable add-ons can deny
+specific tools, command prefixes and paths, and add Jev instructions. There are no
+allow overrides: any fixed denial wins, even if Jev would approve.
+
+General development trades strict execution restrictions for usability. Allowing a
+script does not prove that everything it does is safe. It is not a syscall sandbox.
+Existing version-1 installations retain their strict behavior and policy unchanged.
 
 ## Install
 
@@ -41,7 +47,7 @@ python3 -m unittest discover -v
 python3 install_multi.py --dry-run
 
 # Install for detected CLIs, or select them explicitly:
-python3 install_multi.py --clients codex claude devin
+python3 install_multi.py --clients codex claude devin --preset general-development
 
 # Enter the key privately; it is not displayed or put in command history.
 python3 ~/.codex/guards/jev/set_key.py
@@ -63,27 +69,57 @@ all otherwise-eligible calls.
 cmux needs no separate hook: the agents inside it load the above user settings.
 Commands you type manually in the terminal are unaffected.
 
-## Configure your production targets
+## Customize with policy packs and add-ons
 
 Edit the **installed** `~/.codex/guards/jev/policy.json` in your own editor:
 
 ```json
 {
+  "preset": "general-development",
+  "packs": ["production-read-only", "no-auth-changes", "protected-paths"],
   "production_identifiers": ["company-prod-project", "db.production.example.com"],
   "production_paths": ["/srv/production-data"],
-  "session_ids": []
+  "protected_paths": [{"path": "/srv/customer-data", "access": "read-only"}],
+  "addons": [{
+    "name": "team-publishing",
+    "instructions": "Never publish packages or push repository changes.",
+    "deny_command_prefixes": [["git", "push"], ["npm", "publish"]],
+    "deny_tools": ["mcp__deployment__publish"]
+  }]
 }
 ```
 
-These are fields to change in the existing policy, not a replacement policy file.
-An empty session list covers all local sessions. Exact identifiers strengthen fixed
-matching; names containing `prod`, `production`, `prd` or `live` are also checked.
-Unknown remote writes are conservatively blocked even without identifiers.
-Updates preserve your installed policy and key; the installer enables all-session
-scope by clearing `session_ids`.
+Merge these fields into the installed version-2 policy; do not replace the entire file.
+Complete configurations are in [examples](examples). Only enabled packs contribute
+Jev questions and restrictions. Protected paths also apply when specified directly or
+inside an add-on: `read-only` denies writes, while `deny` denies reads and writes.
+Overlapping path rules take the most restrictive result. Paths must be absolute or
+start with `~/`. Command prefixes are arrays of literal command/argument tokens;
+no executable plugin or arbitrary regex is loaded. Fixed matching is best-effort,
+not a complete shell parser. Unknown fields/packs and invalid values are rejected.
 
-The initial Jev thresholds are allow probability 0.99 and confidence 0.90 for every
-question. These are starting values, **not calibrated security error rates**.
+For a fresh installation, select presets/packs on the command line:
+
+```sh
+python3 install_multi.py --clients claude --preset production-safe
+python3 install_multi.py --clients codex --preset general-development --pack no-auth-changes
+python3 install_multi.py --clients devin --preset strict
+```
+
+Existing policies are preserved **byte-for-byte**, including session scope and key
+location. The installer refuses preset/pack flags when a policy already exists;
+change that policy explicitly in your editor instead. Version 1 remains supported
+with its original strict semantics. To adopt version 2 deliberately, start from a
+complete example and retain your key location, session IDs and production targets.
+
+An empty `session_ids` array means all local sessions. Production targets are enforced
+when `production-read-only` is enabled; that pack also conservatively blocks unknown
+remote mutations. User instructions in add-ons cannot override fixed prohibitions.
+
+New general-development installations start at allow probability 0.95 and confidence
+0.90 for every question. The installer uses 0.99 allow probability when selecting
+production-safe or strict; their complete examples also use 0.99. Edit these fields
+explicitly to customize them. These are starting values, **not calibrated security error rates**.
 
 ## What leaves your machine
 

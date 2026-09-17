@@ -4,11 +4,11 @@
   "production_identifiers": [],
   "production_paths": [],
   "model": "jev-latest",
-  "minimum_allow_probability": 0.95,
+  "minimum_allow_probability": 0.99,
   "minimum_confidence": 0.9,
   "api_timeout_seconds": 8,
   "key_file": "~/.codex/guards/jev/typesafe.key",
-  "preset": "general-development",
+  "preset": "strict",
   "packs": [],
   "addons": [],
   "protected_paths": []

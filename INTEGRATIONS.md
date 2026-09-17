@@ -32,3 +32,10 @@ Devin Cloud or other hosts automatically.
 Custom config roots, alternative CODEX_HOME values, managed-only hook policies and
 configuration overrides can prevent these default user files from being loaded.
 Verify the effective hook list in the specific client you use.
+
+## Policy compatibility
+
+New installs use version 2 with the general-development preset. Runtime files include
+policies.py and packs.json. Existing version-1 policies retain their original strict
+checks, and updates preserve policy bytes and scope. Do not copy the repository's
+default policy over a configured installation unless you deliberately want to replace it.

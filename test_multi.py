@@ -44,7 +44,7 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual(hook.evaluate_hook(e,POLICY,self.engine())['hookSpecificOutput']['permissionDecision'],'deny')
 
     def test_cli_contract(self):
-        for e in (event('gcloud auth login'),event('aws sso login',tool_name='exec'),{}):
+        for e in (event('rm -rf /System'),event('rm -rf /System',tool_name='exec'),{}):
             p=subprocess.run([sys.executable,'-I',str(Path(hook.__file__))],input=json.dumps(e),capture_output=True,text=True)
             self.assertEqual(p.returncode,2)
             self.assertEqual(p.stdout,'')
@@ -84,7 +84,7 @@ class MultiInstallTests(unittest.TestCase):
                 self.assertEqual(d['hooks']['PreToolUse'][0],original[client]['hooks']['PreToolUse'][0])
                 self.assertEqual(len(d['hooks']['PreToolUse']),2)
             policy=json.loads((root/'policy.json').read_text())
-            self.assertEqual(policy['session_ids'],[])
+            self.assertEqual(policy['session_ids'],['old-session'])
             self.assertEqual(policy['production_identifiers'],['keep-me'])
             self.assertEqual((root/'typesafe.key').read_text(),'sentinel-not-real')
             self.assertEqual(len(list(Path(manifest['backup']).glob('*key*'))),0)

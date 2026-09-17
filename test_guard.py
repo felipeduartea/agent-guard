@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 import guard
 
-POLICY = json.loads((Path(__file__).parent/'policy.json').read_text())
+POLICY = json.loads((Path(__file__).parent/'legacy-policy.json').read_text())
 
 def event(command='git status', **updates):
     e = {'session_id':'test-session', 'hook_event_name':'PreToolUse',
@@ -139,7 +139,7 @@ class GuardTests(unittest.TestCase):
 
     def test_process_contract(self):
         script=str(Path(__file__).parent/'guard.py')
-        for body in ['not json',json.dumps(event('gcloud auth login')), 'x'*(guard.LIMIT+1)]:
+        for body in ['not json',json.dumps(event('rm -rf /System')), 'x'*(guard.LIMIT+1)]:
             p=subprocess.run([sys.executable,script],input=body,text=True,capture_output=True,timeout=5)
             self.assertEqual(p.returncode,0)
             self.assertEqual(json.loads(p.stdout)['hookSpecificOutput']['permissionDecision'],'deny')
