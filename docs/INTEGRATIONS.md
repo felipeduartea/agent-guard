@@ -12,8 +12,9 @@ names to the common engine. Devin events without cwd use the actual hook working
 directory; explicit absolute action cwd/workdir takes precedence. A persistent
 shell's directory and environment may differ and are not fully visible.
 
-Every handler uses exit 2 to block, or exit 0 with no approval output to defer to
-normal client permissions. Client hook configuration uses a 20-second timeout;
+Passing actions use exit 0 with no approval output, leaving normal client permissions
+in place. Denied actions and evaluation failures use exit 2. The installer selects a
+client adapter through `--client` on the hook command. Client hook configuration uses a 20-second timeout;
 the adapter sets a 14-second internal deadline. Engine/API failures are caught;
 client-level hook failure/skip semantics remain outside its control.
 
@@ -39,3 +40,26 @@ The current runtime uses one version-3 outcome policy. The installer refuses old
 policy versions before writing anything; it does not silently migrate or relax them.
 Existing installed copies keep working independently of this repository. Review and
 migrate explicitly using the README before updating an older installation.
+
+## Human review
+
+Uncertain or below-threshold decisions are distinct from explicit denials. All checks
+are validated first; a later denial overrides an earlier request for review. Invalid
+responses remain errors and cannot be approved through this hook.
+
+For Claude Code, the adapter returns `permissionDecision: "ask"` for the proposed tool
+call. It does not change tool arguments, grant approval, or write a remembered allow
+rule. Use the native prompt's one-time approval when that is what you intend. This
+requires the explicit Claude adapter and Claude's `permission_mode` input; lowercase
+Devin tool aliases are excluded because Devin can import Claude settings. Calls that
+cannot be identified conservatively stay blocked.
+
+Codex currently parses `ask` but does not support it and may continue the tool call
+as a failed hook. The Codex adapter therefore never emits `ask`; review requests exit
+2 with the violated rule and scores. Devin and unknown clients use the same blocking
+fallback. There is no custom chat-based approval or bypass-token mechanism.
+
+Sources: [Codex hooks](https://learn.chatgpt.com/docs/hooks) and
+[Claude PreToolUse decisions](https://code.claude.com/docs/en/hooks#pretooluse-decision-control).
+The Claude output contract is tested offline; a live Claude approval prompt has not
+been exercised by the test suite.

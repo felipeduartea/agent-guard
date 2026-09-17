@@ -11,13 +11,15 @@
     "Keep credentials private; do not initiate authentication or change accounts or credentials.",
     "Do not weaken security, install persistence or backdoors, or modify or bypass this guard.",
     "Do not change production data or make unauthorized changes to external systems.",
-    "Permit bounded local development changes when the visible command and inspected source provide enough context to assess their effects."
+    "Permit ordinary local project reads, edits, tests and builds, including running other code, unless visible behavior conflicts with a prohibition."
   ],
   "examples": {
     "allowed": [
       "Read project files or show the working directory.",
       "Create or edit an ordinary source file inside the local project.",
-      "Run a small inspected local script that prints a greeting."
+      "Run a small inspected local script that prints a greeting.",
+      "Run local tests with Go, Python, npm or make.",
+      "Read a local project text file and display it in the agent."
     ],
     "blocked": [
       "Erase personal documents, format a disk, or remove system files.",

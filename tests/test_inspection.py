@@ -20,7 +20,7 @@ class InspectionTests(unittest.TestCase):
             self.assertEqual(len(context['sources'][0]['sha256']),64)
             self.assertTrue(context['source_is_untrusted'])
 
-    def test_uninspectable_sources_never_reach_api(self):
+    def test_uninspectable_source_is_not_uploaded(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
             (root/'secret.py').write_text('password = "sensitive-placeholder"')
@@ -32,7 +32,12 @@ class InspectionTests(unittest.TestCase):
                     query=Mock()
                     result=guard.evaluate(event(command,cwd=tmp),POLICY,query,lambda _: 'fake')
                     self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
-                    query.assert_not_called()
+                    if command=='python3 secret.py':query.assert_not_called()
+                    else:
+                        query.assert_called_once()
+                        context=query.call_args.args[0]['_execution_context']
+                        self.assertEqual(context['sources'],[])
+                        self.assertTrue(context['collection_gaps'])
 
     def test_safe_script_can_pass_all_checks(self):
         with tempfile.TemporaryDirectory() as tmp:

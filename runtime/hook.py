@@ -4,6 +4,7 @@
 Never emits an approval, so passing Jev cannot bypass normal client permissions.
 No client/env-based exemption: Devin can also load this hook from Claude settings.
 """
+import argparse
 import importlib.util
 import json
 import os
@@ -54,7 +55,22 @@ def evaluate_hook(event, policy, engine):
 def deadline(*_):
     raise TimeoutError('hook deadline')
 
-def main():
+def emit_decision(output, client, event):
+    decision=output['permissionDecision']
+    if decision=='allow':return 0  # Defer to native permissions; never emit approval.
+    reason=output['permissionDecisionReason']
+    if decision=='ask':
+        # Devin may import Claude's hook configuration. Require Claude's documented
+        # permission_mode input too, and reject Devin's lowercase tool aliases.
+        if (client=='claude' and isinstance(event.get('permission_mode'),str)
+                and event.get('tool_name') not in {'exec','edit','write','read','multi_edit','notebook_edit'}):
+            print(json.dumps({'hookSpecificOutput':output}))
+            return 0
+        reason='Human review needed. This client has no supported hook approval prompt; action remains blocked. '+reason
+    print('Jev guard: '+reason,file=sys.stderr)
+    return 2
+
+def main(client='unknown'):
     signal.signal(signal.SIGALRM,deadline)
     signal.alarm(14)
     try:
@@ -67,9 +83,7 @@ def main():
         event = json.loads(raw)
         policy = json.loads((ROOT/'policy.json').read_text())
         output = evaluate_hook(event,policy,engine)['hookSpecificOutput']
-        if output['permissionDecision'] == 'allow':
-            return 0
-        reason = output['permissionDecisionReason']
+        return emit_decision(output,client,event)
     except Exception:
         reason = 'Guard input, configuration, or runtime failure; action blocked.'
     finally:
@@ -78,4 +92,6 @@ def main():
     return 2
 
 if __name__=='__main__':
-    sys.exit(main())
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--client',choices=('codex','claude','devin','unknown'),default='unknown')
+    sys.exit(main(parser.parse_args().client))

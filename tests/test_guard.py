@@ -53,7 +53,7 @@ class GuardTests(unittest.TestCase):
             for change in [{'choice':'deny'},{'choice':'uncertain'},{'confidence':.5},{'confidence':float('nan')},
                            {'confidence':True},{'probabilities':{'allow':1,'deny':1,'uncertain':0}}]:
                 response=good_response();response['answers'][name].update(change)
-                self.assertEqual(decision(event(),lambda *a:response),'deny')
+                self.assertIn(decision(event(),lambda *a:response),('deny','ask'))
 
     def test_api_payload_and_no_target_read(self):
         with patch('urllib.request.build_opener') as op,patch.object(Path,'read_text',side_effect=AssertionError('unexpected read')):

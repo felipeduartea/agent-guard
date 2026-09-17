@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from .test_guard import event, POLICY, good_response
 
 class DiagnosticTests(unittest.TestCase):
-    def reason(self,query,key=lambda _: 'fake'):
+    def reason(self,query,key=lambda _: 'fake',expected='deny'):
         r=guard.evaluate(event(),POLICY,query,key)['hookSpecificOutput']
-        self.assertEqual(r['permissionDecision'],'deny')
+        self.assertEqual(r['permissionDecision'],expected)
         return r['permissionDecisionReason']
 
     def test_request_failures_have_distinct_sanitized_reasons(self):
@@ -36,7 +36,7 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_low_scores_are_explained_without_changing_thresholds(self):
         response=good_response();response['answers']['baseline']['confidence']=.5
-        reason=self.reason(lambda *a:response)
+        reason=self.reason(lambda *a:response,expected='ask')
         self.assertIn('confidence=0.500',reason)
         self.assertIn('required allow>=',reason)
 

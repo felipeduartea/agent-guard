@@ -5,7 +5,7 @@ Claude Code or Devin CLI. It also works when you launch those agents inside cmux
 
 You configure it with plain-language rules and examples. The default policy protects
 important files, credentials and system security, blocks login/account changes and
-production writes, and allows local development work whose effects can be assessed.
+production writes, and allows ordinary local development, including tests and builds.
 Fixed emergency checks run first. Jev then reviews the command, tool arguments and
 available script context.
 
@@ -66,8 +66,11 @@ to all local sessions; fill the list to limit the guard to specific session IDs.
 
 Rules take precedence over allowed examples and instructions embedded in commands or
 source code. Every Jev check must meet the configured allow probability and confidence
-thresholds. Denial, uncertainty, invalid responses or exhausted API retries block the
-action. A passing result still leaves the agent's own permissions in effect.
+thresholds. A denial blocks the action. Uncertainty or low scores request human review:
+Claude Code can show a permission prompt for that call; Codex and Devin keep it blocked
+because their supported hook interfaces cannot provide that prompt. API failures and
+invalid responses also block, with a separate diagnostic. A passing result leaves the
+agent's own permissions in effect. Saying "I approve" in chat does not override a block.
 
 ## Test
 
@@ -79,7 +82,7 @@ python3 -m unittest discover -v
 python3 scripts/smoke_test.py --extended
 ```
 
-The live test sends twelve proposals through a copy of the hook without executing
+The live test sends twenty-one proposals through a copy of the hook without executing
 them. It reports each result and exits nonzero if any expectation fails. Service
 outages count as failures, even if they prevent a dangerous proposal from running.
 
@@ -88,15 +91,16 @@ rule forbidding one harmless filename, then ask the agent to create that file an
 permitted file in separate calls. Look for a hook rejection in the tool result. The
 agent refusing on its own does not prove interception. Use harmless probes only.
 
-[EVALUATION.md](docs/EVALUATION.md) records the results, including a harmless file read that
-still gets blocked. These tests do not establish a security error rate.
+[EVALUATION.md](docs/EVALUATION.md) records the results, including tests of local builds,
+file edits and prohibited command combinations. These tests do not establish a security error rate.
 
 ## What leaves your machine
 
 TypeSafe receives the policy, tool arguments, working directory and collected context.
 Arguments can contain private source or patches. The guard also reads up to three local
-entrypoint scripts, at most 32 KiB each, and sends their contents and hashes. It blocks
-missing, oversized, sensitive-looking or outside-workspace scripts before contacting Jev.
+entrypoint scripts, at most 32 KiB each, and sends their contents and hashes. Missing,
+oversized, sensitive-path or outside-workspace sources are omitted and marked unavailable.
+Detected secret material still blocks the request before contacting Jev.
 
 For literal Python `Path(...).read_text()` / `read_bytes()` calls, the guard can collect
 path metadata and scan up to twelve small local files for known secret patterns.
@@ -105,9 +109,10 @@ skips sensitive paths, symlinks, oversized files and files that are not regular 
 It cannot detect every secret or fully analyze Python behavior.
 
 The guard does not fully resolve imports, shell startup files, runtime inputs or
-subprocess dependencies. It currently blocks package, build and container launchers
-such as `npm test` because it cannot inspect everything they execute. For other unclear
-behavior, it relies on Jev recognizing uncertainty. [SECURITY.md](docs/SECURITY.md) describes
+subprocess dependencies. Commands such as `npm test` still reach Jev for review. Missing
+dependency source alone does not count as a hazard. Visible destructive operations,
+credential access or forbidden external writes still block, even when combined with
+a test command. Hidden effects inside uninspected dependencies can be missed. [SECURITY.md](docs/SECURITY.md) describes
 these limits.
 
 Transient API errors get one retry at most, within the existing time budget. Policy
@@ -119,6 +124,8 @@ credentials. TypeSafe bills API usage to your account.
 
 For a version-3 installation, pull the repository and rerun the installer with the
 same clients. It preserves your policy and key. Restart the agent and review its hooks.
+Existing custom rules can still prohibit tests or builds; review those rules if you
+want the current default development permissions. The installer does not rewrite them.
 
 The installer stops before changing a version-1/2 installation, which continues to
 run its existing copy. To migrate, back up the guard directory and client configs.

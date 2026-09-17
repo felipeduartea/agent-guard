@@ -30,13 +30,14 @@ def write_atomic(path, data, mode=0o600):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 
-def hook_command(root):
+def hook_command(root,client=None):
     # If the adapter cannot even start, map the error to a blocking exit (2),
     # rather than letting clients treat an arbitrary nonzero exit as advisory.
     return (shlex.quote(sys.executable)+' -I '+shlex.quote(str(root/'hook.py'))+
+            (' --client '+shlex.quote(client) if client else '')+
             " || { printf '%s\\n' 'Jev guard blocked the action or could not run.' >&2; exit 2; }")
 
-def merge_config(existing, root):
+def merge_config(existing, root, client=None):
     d=copy.deepcopy(existing)
     if d.get('disableAllHooks') is True:
         raise RuntimeError('Client has disableAllHooks enabled; cannot install an effective guard.')
@@ -49,7 +50,7 @@ def merge_config(existing, root):
         g['hooks']=[h for h in g.get('hooks',[]) if not (
             str(root/'guard.py') in h.get('command','') or str(root/'hook.py') in h.get('command',''))]
         if g['hooks']: new.append(g)
-    new.append({'matcher':'','hooks':[{'type':'command','command':hook_command(root),'timeout':20}]})
+    new.append({'matcher':'','hooks':[{'type':'command','command':hook_command(root,client),'timeout':20}]})
     d['hooks']['PreToolUse']=new
     return d
 
@@ -70,7 +71,7 @@ def install(home, clients=None, dry_run=False):
         if path.is_symlink(): raise RuntimeError('Symlink client config')
         original=path.read_bytes() if path.exists() else None
         content=json.loads(original) if original is not None else {}
-        plan[client]=(path,original,merge_config(content,root))
+        plan[client]=(path,original,merge_config(content,root,client))
     if dry_run:
         return {'dry_run':True,'scope':policy['session_ids'] or 'all local sessions','policy_preserved':policy_path.exists(),'configs':{c:str(p[0]) for c,p in plan.items()},
                 'guard_directory':str(root),'key_value':'never read by installer'}

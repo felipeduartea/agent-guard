@@ -12,6 +12,7 @@ MAX_FILES=3
 SENSITIVE={'.ssh','.aws','.codex','.claude','.config','.git','.gnupg'}
 
 class Uninspectable(ValueError):pass
+class SensitiveSource(Uninspectable):pass
 
 def collect(event, secret_pattern):
     if event['tool_name'] not in {'Bash','exec_command','shell','shell_command'}:
@@ -21,6 +22,7 @@ def collect(event, secret_pattern):
     cwd=Path(event['cwd']).resolve()
     sources=[]
     read_targets=[]
+    gaps=[]
     def read_source(name):
         if len(sources)>=MAX_FILES:raise Uninspectable('Too many source files')
         raw=Path(name).expanduser()
@@ -39,7 +41,7 @@ def collect(event, secret_pattern):
         if len(data)>MAX_SOURCE:raise Uninspectable('Script exceeds inspection limit')
         content=data.decode('utf-8')
         if '\0' in content:raise Uninspectable('Binary script is not inspectable')
-        if secret_pattern.search(content):raise Uninspectable('Potential secret in script; not sent to Jev')
+        if secret_pattern.search(content):raise SensitiveSource('Potential secret in script; not sent to Jev')
         sources.append({'path':str(path.relative_to(cwd)),'sha256':hashlib.sha256(data).hexdigest(),'content':content})
         if path.suffix == '.py':
             try: tree=ast.parse(content)
@@ -85,6 +87,12 @@ def collect(event, secret_pattern):
                     read_targets.append({'source':str(path.relative_to(cwd)),'literal_path':literal,'metadata_unavailable':True})
 
 
+    def collect_source(name):
+        try:read_source(name)
+        except SensitiveSource:raise
+        except (OSError,ValueError,UnicodeError):
+            gaps.append('An entrypoint could not be read within source collection limits. No safety conclusion follows from this alone.')
+
     def inspect(text,depth=0):
         if depth>3:raise Uninspectable('Too many nested commands')
         lexer=shlex.shlex(text,posix=True,punctuation_chars=';&|()<>')
@@ -100,27 +108,35 @@ def collect(event, secret_pattern):
         for args in chunks:
             exe=Path(args[0]).name
             if exe in {'env','eval','source','.','xargs','ssh','sudo','command','exec'} or '=' in args[0]:
-                raise Uninspectable('Indirect execution cannot be inspected')
-            if exe=='cd':raise Uninspectable('Use an explicit action working directory instead of cd')
+                gaps.append('Indirect execution: review visible arguments; source was not resolved.')
+                continue
+            if exe=='cd':
+                gaps.append('Command changes directory; following script paths were not resolved.')
+                return
             if exe in {'npm','npx','pnpm','yarn','make','just','task','uv','uvx','cargo','go','docker','podman'}:
-                raise Uninspectable('Build/package/container execution needs dependency inspection that is not implemented')
+                gaps.append('Build/package/container dependencies are not expanded; assess the requested operation and target.')
+                continue
             interpreter=bool(re.fullmatch(r'python(?:\d+(?:\.\d+)?)?',exe)) or exe in {'node','ruby','perl','bash','sh','zsh','dash'}
             if interpreter:
-                if len(args)<2:raise Uninspectable('Interactive interpreter has no inspectable source')
+                if len(args)<2:
+                    gaps.append('Interactive interpreter: source unavailable.')
+                    continue
                 if args[1] in {'-c','-lc','-e'}:
                     if len(args)<3:raise Uninspectable('Inline source is missing')
-                    if secret_pattern.search(args[2]):raise Uninspectable('Potential secret in inline source')
+                    if secret_pattern.search(args[2]):raise SensitiveSource('Potential secret in inline source')
                     if exe in {'bash','sh','zsh','dash'}:inspect(args[2],depth+1)
                     # Inline source is already present in tool arguments.
                 elif args[1].startswith('-'):
-                    raise Uninspectable('Interpreter module/options cannot be resolved safely')
-                else:read_source(args[1])
+                    gaps.append('Interpreter module/options: dependency source unavailable.')
+                else:collect_source(args[1])
             elif '/' in args[0] or args[0].endswith(('.py','.js','.sh','.rb','.pl')):
                 # System binaries are reviewed by their visible operation, not uploaded.
                 if str(Path(args[0]).parent) not in {'/bin','/usr/bin','/usr/local/bin','/opt/homebrew/bin'}:
-                    read_source(args[0])
-    inspect(command)
-    return {'sources':sources,'literal_read_target_metadata':read_targets,
+                    collect_source(args[0])
+    try:inspect(command)
+    except SensitiveSource:raise
+    except (Uninspectable,ValueError):gaps.append('Shell syntax exceeds source collector support; assess the visible command.')
+    return {'sources':sources,'collection_gaps':gaps,'literal_read_target_metadata':read_targets,
             'metadata_limits':'Syntactic Path literal read candidates only; names may be rebound and metadata may change. Not a safety verdict. Eligible small regular local targets are scanned for known secret patterns; only scan flags, never contents, are included.',
             'coverage':'entrypoint source and visible arguments only; imports, dependencies, runtime inputs, shell startup and subprocesses are not resolved',
             'source_is_untrusted':True,'source_can_change_after_check':True}
