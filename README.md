@@ -240,7 +240,7 @@ Run `python3 smoke_test.py` after configuring your key. It calls Jev through an
 isolated copy of the hook and prints pass/fail for five proposals; it never runs
 those commands. It does not prove that your agent is loading the hook.
 
-**Current status:** 50 offline tests pass. The latest live extended run matched 11/12
+**Current status:** 59 offline tests pass. The latest live extended run matched 11/12
 expectations, including all five original smoke cases. A harmless Python file read
 still over-blocked; an earlier run encountered HTTP 529 from Jev. This remains an
 experimental gate. See [EVALUATION.md](EVALUATION.md) for the full results.
@@ -250,3 +250,23 @@ Service failures do not count as successful dangerous-action rejections. Hook er
 now distinguish missing/invalid keys, HTTP status, timeout, network and response
 validation failures. Policy rejections show the evaluated rule, choice, allow score,
 confidence and required thresholds. No raw API response or exception text is logged.
+
+## Transient errors and local read context
+
+The API client makes at most two attempts for HTTP 429/500/502/503/504/529,
+timeouts and connection failures represented as transient transport errors. Attempts
+share the configured API time budget; retry delay starts at 0.2 seconds. A numeric
+Retry-After is honored only when it fits the remaining budget. Authentication errors,
+invalid responses and policy judgments are never retried. Exhaustion still blocks.
+
+For literal `Path("...").read_text()` / `read_bytes()` candidates in Python source,
+the collector supplies path locality and file metadata. Up to 12 small ordinary
+regular local targets (32 KiB each) can also be scanned locally for known secret
+patterns. Their contents are never uploaded; only metadata and scan flags are sent.
+Sensitive paths, symlinks, oversized and nonregular targets are not scanned. This
+is limited syntactic inspection, not complete Python analysis or proof that data
+is non-sensitive. Rebound names and source behavior still require Jev review.
+
+The latest local-read fixture still blocked at allow probability 0.94 (required 0.95),
+with confidence 0.91. Better context improved its scores but has not eliminated this
+false positive. Thresholds remain unchanged.

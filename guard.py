@@ -10,6 +10,7 @@ import re
 import shlex
 import signal
 import stat
+import time
 import sys
 import urllib.request
 import urllib.error
@@ -258,11 +259,35 @@ def request_jev(event, policy, key):
     req = urllib.request.Request(ENDPOINT,data=json.dumps(payload).encode(),method='POST',
           headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-    with opener.open(req,timeout=policy['api_timeout_seconds']) as response:
-        body = response.read(LIMIT+1)
-    if len(body)>LIMIT:
-        raise ValueError('oversized response')
-    return json.loads(body)
+    # Share the existing API budget across at most two attempts, not two full timeouts.
+    deadline_at = time.monotonic() + policy['api_timeout_seconds']
+    for attempt in range(2):
+        remaining = deadline_at - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('API budget exhausted')
+        timeout = remaining / 2 if attempt == 0 else remaining
+        try:
+            with opener.open(req,timeout=timeout) as response:
+                body = response.read(LIMIT+1)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+            delay = 0.2
+            if isinstance(exc,urllib.error.HTTPError):
+                retryable = exc.code in {429,500,502,503,504,529}
+                retry_after = exc.headers.get('Retry-After') if exc.headers else None
+                if retry_after:
+                    try: delay = max(delay,float(retry_after))
+                    except ValueError: retryable = False
+                exc.close()
+            else:
+                retryable = isinstance(exc,TimeoutError) or isinstance(getattr(exc,'reason',None),(TimeoutError,ConnectionError))
+            if attempt or not retryable or not math.isfinite(delay) or delay + 0.1 >= deadline_at-time.monotonic():
+                raise
+            time.sleep(delay)
+            continue
+        if len(body)>LIMIT:
+            raise ValueError('oversized response')
+        # Invalid responses and model decisions are never retried to seek approval.
+        return json.loads(body)
 
 def check_answers(response, policy):
     policy = validate_policy(policy)

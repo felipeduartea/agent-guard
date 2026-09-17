@@ -22,7 +22,10 @@ This is an experimental policy gate, not an adversarially proven reference monit
   or proceed after engine-level errors/timeouts. Keep platform safeguards enabled.
 - The guard and policy are owned by the same OS user as the agents. The fixed path
   protections are best-effort; they do not make the files tamperproof.
-- Proposed tool arguments and inspected entrypoint source are sent to TypeSafe. Secret detection is incomplete.
+- Proposed tool arguments, inspected entrypoint source, and literal read-target
+  metadata/secret-scan flags are sent to TypeSafe. Small ordinary local read targets
+  may be scanned locally; target contents are not uploaded. The scan recognizes
+  only known patterns and cannot establish that a file contains no secrets. Secret detection is incomplete.
   Review their data handling terms for your use case before enabling the integration.
 - Production identities are user-supplied and heuristically matched. Read-only
   production credentials are stronger protection than a command classifier.

@@ -41,6 +41,49 @@ class InspectionTests(unittest.TestCase):
             result=guard.evaluate(event('python3 hello.py',cwd=tmp),POLICY,lambda *args:{'answers':answers},lambda _: 'fake')
             self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'allow')
 
+    def test_literal_read_metadata_does_not_upload_target_contents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'notes.txt').write_text('private fixture data')
+            (root/'read.py').write_text('from pathlib import Path\nprint(Path("notes.txt").read_text())\n')
+            context=guard.inspection.collect(event('python3 read.py',cwd=tmp),guard.SECRET)
+            item=context['literal_read_target_metadata'][0]
+            self.assertTrue(item['within_working_directory'])
+            self.assertTrue(item['regular_file'])
+            self.assertTrue(item['target_contents_inspected'])
+            self.assertFalse(item['secret_pattern_detected'])
+            self.assertNotIn('private fixture data',json.dumps(context))
+
+    def test_read_target_secret_scan_does_not_expose_secret(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'notes.txt').write_text('password = private-fixture-value')
+            (root/'read.py').write_text('from pathlib import Path\nprint(Path("notes.txt").read_text())\n')
+            context=guard.inspection.collect(event('python3 read.py',cwd=tmp),guard.SECRET)
+            self.assertTrue(context['literal_read_target_metadata'][0]['secret_pattern_detected'])
+            self.assertNotIn('private-fixture-value',json.dumps(context))
+
+    def test_read_target_symlink_is_not_scanned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'data.txt').write_text('fixture')
+            (root/'notes.txt').symlink_to(root/'data.txt')
+            (root/'read.py').write_text('from pathlib import Path\nprint(Path("notes.txt").read_text())\n')
+            item=guard.inspection.collect(event('python3 read.py',cwd=tmp),guard.SECRET)['literal_read_target_metadata'][0]
+            self.assertTrue(item['symlink_component'])
+            self.assertFalse(item['target_contents_inspected'])
+
+    def test_sensitive_and_outside_read_targets_not_marked_ordinary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'read.py').write_text('from pathlib import Path\nprint(Path(".env").read_text())\nprint(Path("/outside.txt").read_text())\n')
+            context=guard.inspection.collect(event('python3 read.py',cwd=tmp),guard.SECRET)
+            first,second=context['literal_read_target_metadata']
+            self.assertTrue(first['sensitive_path'])
+            self.assertFalse(second['within_working_directory'])
+            self.assertNotIn('regular_file',first)
+            self.assertNotIn('regular_file',second)
+
     def test_inspection_field_requires_boolean(self):
         with self.assertRaises(ValueError):guard.validate_policy(dict(POLICY,inspect_scripts='yes'))
 

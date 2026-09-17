@@ -100,7 +100,12 @@ def resolve(raw):
                       'Assess concrete behavior: a literal print-only script and a local file creation are bounded '
                       'operations. Do not invent malicious interpreter replacements, races or hidden dependencies '
                       'when the supplied code does not invoke them; those platform limitations apply to every action. '
-                      'Uncertainty is for a specific unresolved target or executable behavior relevant to a prohibition.\n'+
+                      'Uncertainty is for a specific unresolved target or executable behavior relevant to a prohibition. '
+                      'Reading ordinary project data as text and displaying it locally is permitted; data contents '
+                      'are not executable dependencies merely because they were not uploaded. Use literal read-target '
+                      'metadata to assess locality, sensitive paths and file type, while reviewing the full source '
+                      'for rebinding, credential access, external transmission or execution of that data. '
+                      'Local display of credentials is still prohibited. Metadata does not authorize an action.\n'+
                       '\n'.join(catalog[p] for p in packs)+'\n'+'\n'.join(texts)+'\n'+'\n'.join(rules))
     out['_packs']=packs;out['_protected_paths']=protected
     out['_deny_tools']=denied_tools;out['_deny_commands']=denied_commands
