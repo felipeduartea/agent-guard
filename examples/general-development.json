@@ -11,5 +11,22 @@
   "preset": "general-development",
   "packs": [],
   "addons": [],
-  "protected_paths": []
+  "protected_paths": [],
+  "rules": [
+    "Keep credentials private.",
+    "Do not damage operating-system files or weaken system security.",
+    "Do not modify or bypass this guard."
+  ],
+  "examples": {
+    "allowed": [
+      "Read local project files.",
+      "Edit application code in the local workspace.",
+      "Run local tests or build the project."
+    ],
+    "blocked": [
+      "Expose an API key to an external recipient.",
+      "Erase system files or format a disk.",
+      "Disable the guard to get a blocked action through."
+    ]
+  }
 }

@@ -10,6 +10,9 @@ This is an experimental policy gate, not an adversarially proven reference monit
 - Tool hooks are not filesystem/syscall hooks. A permitted program may read files
   internally. Hosted tools, injected terminal input and specialized paths may not
   call PreToolUse. Other configured hooks execute independently.
+- Outcome examples are model guidance, not deterministic enforcement. Semantically
+  conflicting examples cannot be fully validated locally; the evaluator is instructed
+  to prefer prohibitions or uncertainty. Allowed examples never skip fixed checks.
 - Jev decisions are probabilistic. Structured types guarantee neither accuracy nor
   resistance to prompt injection. Four passing examples do not establish a security
   error rate. Test with your own policies and workloads before relying on it.

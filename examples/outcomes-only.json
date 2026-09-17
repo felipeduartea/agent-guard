@@ -15,18 +15,26 @@
   "rules": [
     "Keep credentials private.",
     "Do not damage operating-system files or weaken system security.",
-    "Do not modify or bypass this guard."
+    "Do not modify or bypass this guard.",
+    "Never create, update, or delete production data.",
+    "Never initiate login or switch account identities.",
+    "Treat writes to an unknown remote environment as prohibited."
   ],
   "examples": {
     "allowed": [
       "Read local project files.",
       "Edit application code in the local workspace.",
-      "Run local tests or build the project."
+      "Run local tests or build the project.",
+      "Read production logs using an existing authenticated session."
     ],
     "blocked": [
       "Expose an API key to an external recipient.",
       "Erase system files or format a disk.",
-      "Disable the guard to get a blocked action through."
+      "Disable the guard to get a blocked action through.",
+      "Delete customer records from a production database.",
+      "Upload replacement data into a production database.",
+      "Start a Google Cloud login flow.",
+      "Switch the active cloud account."
     ]
   }
 }

@@ -12,7 +12,7 @@ from test_guard import event
 DEFAULT=json.loads((Path(__file__).parent/'policy.json').read_text())
 
 def config(preset='general-development',**values):
-    p=copy.deepcopy(DEFAULT);p['preset']=preset;p.update(values);return p
+    p=copy.deepcopy(DEFAULT);p.pop('rules',None);p.pop('examples',None);p['preset']=preset;p.update(values);return p
 
 def permitted(e,p):
     resolved=guard.validate_policy(p)

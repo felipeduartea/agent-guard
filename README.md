@@ -9,7 +9,54 @@ file access, existing terminal input, hosted tool or subprocess. Jev can make an
 incorrect decision. Use read-only production credentials and an OS sandbox for
 stronger enforcement.
 
-## Choose a policy
+## Describe outcomes, not command names
+
+New users can write plain-language rules and examples in their installed `policy.json`.
+No command list is required. For example, merge these fields into your version-2 policy:
+
+```json
+{
+  "rules": [
+    "Never change production data.",
+    "Never initiate login or switch identities."
+  ],
+  "examples": {
+    "allowed": [
+      "Read production logs using an existing session.",
+      "Edit local application code.",
+      "Run local tests."
+    ],
+    "blocked": [
+      "Delete customer records from production.",
+      "Upload replacement data to a production database.",
+      "Start a Google Cloud login flow."
+    ]
+  }
+}
+```
+
+Jev evaluates the proposed outcome against the rules and examples, including unfamiliar
+commands and non-shell tools. Examples are illustrative, not exact string matches.
+Each written rule gets a separate check, plus a check against the examples. Every check
+must pass the configured thresholds. An allowed example never overrides a prohibition;
+conflicting interpretations are blocked or marked uncertain. Exactly identical allowed
+and blocked examples are rejected during configuration validation.
+
+The fresh-install default includes general development examples and basic protections.
+The production/authentication restrictions above are **optional**, not silently enabled
+for everyone. [outcomes-only.json](examples/outcomes-only.json) is a complete example of
+that policy with no command denylist or fixed production/authentication pack.
+
+A small built-in safety layer still rejects obvious dangerous system operations,
+guard tampering and detected credential material before calling Jev. Outcome matching
+is probabilistic and cannot reveal a script's hidden behavior. Eligible actions are
+sent to Jev; this is not a rules-only or zero-API mode.
+
+Known limitation: the live smoke check still falsely blocked an allowed production-log
+read. See [evaluation results](EVALUATION.md). Examples improve configuration ergonomics;
+they do not eliminate false positives or prove enforcement accuracy.
+
+## Optional presets and deterministic restrictions
 
 New installations default to **general-development**. Every preset includes a baseline
 against system destruction, credential exposure and guard tampering. Passing fixed checks
@@ -22,7 +69,8 @@ still requires Jev evaluation and the agent's normal permissions.
 | `strict` | Production read-only; no authentication changes; strict execution | Blocked |
 
 Packs are additive: `production-read-only`, `no-auth-changes`, `strict-execution`,
-and `protected-paths`. The baseline always applies. Configurable add-ons can deny
+and `protected-paths`. The baseline always applies. These packs are optional; ordinary users can stay with
+plain-language rules and examples. Advanced add-ons can deny
 specific tools, command prefixes and paths, and add Jev instructions. There are no
 allow overrides: any fixed denial wins, even if Jev would approve.
 
@@ -69,7 +117,7 @@ all otherwise-eligible calls.
 cmux needs no separate hook: the agents inside it load the above user settings.
 Commands you type manually in the terminal are unaffected.
 
-## Customize with policy packs and add-ons
+## Advanced: policy packs and deterministic add-ons
 
 Edit the **installed** `~/.codex/guards/jev/policy.json` in your own editor:
 
@@ -90,8 +138,8 @@ Edit the **installed** `~/.codex/guards/jev/policy.json` in your own editor:
 ```
 
 Merge these fields into the installed version-2 policy; do not replace the entire file.
-Complete configurations are in [examples](examples). Only enabled packs contribute
-Jev questions and restrictions. Protected paths also apply when specified directly or
+Complete configurations are in [examples](examples). Only enabled packs contribute pack-specific Jev questions and restrictions. Written
+rules and examples contribute their own questions regardless of the chosen preset. Protected paths also apply when specified directly or
 inside an add-on: `read-only` denies writes, while `deny` denies reads and writes.
 Overlapping path rules take the most restrictive result. Paths must be absolute or
 start with `~/`. Command prefixes are arrays of literal command/argument tokens;
