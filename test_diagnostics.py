@@ -31,17 +31,17 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_invalid_distribution_is_not_a_policy_rejection(self):
         response=good_response()
-        response['answers']['production']['probabilities']={'allow':.98,'deny':.02,'uncertain':.01}
+        response['answers']['baseline']['probabilities']={'allow':.98,'deny':.02,'uncertain':.01}
         self.assertIn('probability sum differs from 1',self.reason(lambda *a:response))
 
     def test_low_scores_are_explained_without_changing_thresholds(self):
-        response=good_response();response['answers']['production']['confidence']=.5
+        response=good_response();response['answers']['baseline']['confidence']=.5
         reason=self.reason(lambda *a:response)
         self.assertIn('confidence=0.500',reason)
         self.assertIn('required allow>=',reason)
 
     def test_unrecognized_choice_is_not_echoed(self):
-        response=good_response();response['answers']['production']['choice']='private-token'
+        response=good_response();response['answers']['baseline']['choice']='private-token'
         reason=self.reason(lambda *a:response)
         self.assertIn('invalid answer schema',reason)
         self.assertNotIn('private-token',reason)

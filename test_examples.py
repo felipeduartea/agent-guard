@@ -17,7 +17,7 @@ class ExamplePolicyTests(unittest.TestCase):
         p=guard.validate_policy(self.policy())
         self.assertEqual(set(p['_questions']),{'baseline','rule_1','examples'})
         self.assertIn('Never change production data.',p['policy'])
-        self.assertIn('never override',p['policy'])
+        self.assertIn('do not override',p['_questions']['examples'])
 
     def test_proposed_examples_cannot_override_trusted_examples(self):
         p=self.policy();e=event(tool_name='mcp__data__execute',tool_input={
@@ -37,7 +37,7 @@ class ExamplePolicyTests(unittest.TestCase):
                         'probabilities':{'allow':1,'deny':0,'uncertain':0}} for k in resolved['_questions']}
             answers[failed]={'type':'choice','choice':'deny','confidence':1,
                             'probabilities':{'allow':0,'deny':1,'uncertain':0}}
-            result=guard.evaluate(event('npm test'),p,lambda *a:{'answers':answers},lambda *a:'fake')
+            result=guard.evaluate(event('pwd'),p,lambda *a:{'answers':answers},lambda *a:'fake')
             self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
 
     def test_examples_do_not_grant_bypass(self):
@@ -56,19 +56,9 @@ class ExamplePolicyTests(unittest.TestCase):
             with self.subTest(fields=fields):
                 with self.assertRaises(ValueError):guard.validate_policy(config(**fields))
 
-    def test_outcome_policy_has_no_command_lists_or_fixed_auth_pack(self):
-        p=json.loads((Path(__file__).parent/'examples/outcomes-only.json').read_text())
-        resolved=guard.validate_policy(p)
-        self.assertEqual(resolved['_packs'],[])
-        self.assertEqual(resolved['_deny_commands'],[])
-        # These proposals reach Jev: they aren't secretly matched to an auth/production denylist.
-        self.assertIsNone(guard.hard_reason(event('gcloud auth login'),p))
-        self.assertIsNone(guard.hard_reason(event(tool_name='mcp__db__execute',tool_input={
-            'sql':'DELETE FROM customers','environment':'production'}),p))
-
     def test_missing_example_answer_denies(self):
         p=self.policy()
-        result=guard.evaluate(event('npm test'),p,lambda *a:{'answers':{}},lambda *a:'fake')
+        result=guard.evaluate(event('pwd'),p,lambda *a:{'answers':{}},lambda *a:'fake')
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -1,17 +1,11 @@
 {
-  "version": 2,
+  "version": 3,
   "session_ids": [],
-  "production_identifiers": [],
-  "production_paths": [],
   "model": "jev-latest",
   "minimum_allow_probability": 0.95,
   "minimum_confidence": 0.9,
   "api_timeout_seconds": 8,
   "key_file": "~/.codex/guards/jev/typesafe.key",
-  "preset": "machine-safety",
-  "packs": [],
-  "addons": [],
-  "protected_paths": [],
   "rules": [
     "Protect important user files and operating-system data from destructive or broad changes.",
     "Keep credentials private; do not initiate authentication or change accounts or credentials.",
@@ -32,6 +26,5 @@
       "Start a cloud login flow or switch the authenticated account.",
       "Modify customer records in production."
     ]
-  },
-  "inspect_scripts": true
+  }
 }

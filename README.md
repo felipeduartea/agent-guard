@@ -1,272 +1,143 @@
 # Agent Guard
 
-A conservative pre-tool guard for **Codex, Claude Code and Devin CLI**, including
-these agents launched inside **cmux**. It combines fixed rules with TypeSafe's Jev
-API to check proposed actions before supported tools run.
+Agent Guard checks proposed actions with TypeSafe's Jev before supported agent tools
+run. It works with Codex, Claude Code and Devin CLI, including agents launched inside
+cmux.
 
-**Experimental guardrail, not an OS security boundary.** It cannot intercept every
-file access, existing terminal input, hosted tool or subprocess. Jev can make an
-incorrect decision. Use read-only production credentials and an OS sandbox for
-stronger enforcement.
+**One safety policy, customized with plain-language rules and examples.** There are
+no presets or policy packs to choose from.
 
-## Describe outcomes, not command names
+The default protects important files, credentials and system security, prohibits
+login/account changes and production writes, and permits bounded local development.
+Small fixed emergency checks run first; Jev then evaluates the command, tool arguments
+and available script context. An allowed example never overrides a prohibition.
 
-New users can write plain-language rules and examples in their installed `policy.json`.
-No command list is required. For example, merge these fields into your version-2 policy:
+This is experimental. It is not an OS sandbox, and it cannot intercept every file
+access or subprocess. Keep native permissions and sandboxing enabled.
+
+## Install from scratch
+
+Requirements: macOS or Linux, Python 3.10+, a supported agent CLI, repository access,
+and a [TypeSafe API key](https://console.typesafe.ai). No Python dependencies to install.
+
+```sh
+git clone https://github.com/felipeduartea/agent-guard.git
+cd agent-guard
+
+python3 install_multi.py --clients codex --dry-run
+python3 install_multi.py --clients codex
+
+# Enter the key privately; it is not printed or stored in shell history.
+python3 ~/.codex/guards/jev/set_key.py
+```
+
+For all three agents use `--clients codex claude devin`. Omit `--clients` to select
+installed CLIs automatically. cmux needs no separate installation; its agents use
+these configurations. Manual terminal commands are not intercepted.
+
+Restart the agent after installation. In Codex, open `/hooks` and review/trust the
+Jev `PreToolUse` hook before testing. Untrusted hooks are skipped. See
+[INTEGRATIONS.md](INTEGRATIONS.md) for client configuration paths and activation.
+
+The installer copies the runtime to `~/.codex/guards/jev/`, preserves unrelated hooks,
+and backs up files it changes. The key is stored at
+`~/.codex/guards/jev/typesafe.key` with owner-only permissions. Alternatively, supply
+`TYPESAFE_API_KEY` in the agent's environment; GUI apps may not inherit shell variables.
+
+## Customize the policy
+
+Edit `~/.codex/guards/jev/policy.json`. Add your requirements to `rules` and your
+illustrative outcomes to `examples.allowed` or `examples.blocked`, keeping the rest
+of the file. For example, append:
 
 ```json
 {
   "rules": [
-    "Never change production data.",
-    "Never initiate login or switch identities."
+    "Never modify the customer data stored under /srv/customers.",
+    "Do not publish releases or push commits to a remote repository."
   ],
   "examples": {
-    "allowed": [
-      "Read production logs using an existing session.",
-      "Edit local application code.",
-      "Run local tests."
-    ],
-    "blocked": [
-      "Delete customer records from production.",
-      "Upload replacement data to a production database.",
-      "Start a Google Cloud login flow."
-    ]
+    "allowed": ["Read application source and edit local tests."],
+    "blocked": ["Upload a release artifact to a public registry."]
   }
 }
 ```
 
-Jev evaluates the proposed outcome against the rules and examples, including unfamiliar
-commands and non-shell tools. Examples are illustrative, not exact string matches.
-Each written rule gets a separate check, plus a check against the examples. Every check
-must pass the configured thresholds. An allowed example never overrides a prohibition;
-conflicting interpretations are blocked or marked uncertain. Exactly identical allowed
-and blocked examples are rejected during configuration validation.
+This is a fragment to merge, not a replacement policy file. Rules and examples are
+trusted configuration; instructions inside proposed commands or source code cannot
+override them. Every enabled Jev check must meet the configured allow probability
+and confidence thresholds. Denial, uncertainty, invalid responses or exhausted API
+retries block the action. Passing the guard does not override the agent's own permissions.
 
-The fresh-install default protects personal files, system security and credentials, blocks login/account changes and production writes, and permits bounded local development. Customize its outcome rules and examples without maintaining a command list.
-The production/authentication restrictions above are **optional**, not silently enabled
-for everyone. [outcomes-only.json](examples/outcomes-only.json) is a complete example of
-that policy with no command denylist or fixed production/authentication pack.
+The complete starting configuration is [policy.json](policy.json). `session_ids: []`
+applies to all local sessions; a nonempty list limits the guard to those session IDs.
+There are no command-list add-ons. Describe custom restrictions in your rules.
 
-A small built-in safety layer still rejects obvious dangerous system operations,
-guard tampering and detected credential material before calling Jev. Outcome matching
-is probabilistic and cannot reveal a script's hidden behavior. Eligible actions are
-sent to Jev; this is not a rules-only or zero-API mode.
-
-Known limitation: the live smoke check still falsely blocked an allowed production-log
-read. See [evaluation results](EVALUATION.md). Examples improve configuration ergonomics;
-they do not eliminate false positives or prove enforcement accuracy.
-
-## Optional presets and deterministic restrictions
-
-New installations default to **machine-safety**, using outcome rules and examples plus bounded local script inspection. Every preset includes a baseline
-against system destruction, credential exposure and guard tampering. Passing fixed checks
-still requires Jev evaluation and the agent's normal permissions.
-
-| Preset | Optional restrictions included | Ordinary Python/npm/make |
-| --- | --- | --- |
-| `machine-safety` (default) | None | Inspected entrypoint scripts eligible; unresolved build/package execution blocked |
-| `general-development` | None | Eligible for Jev review without source inspection |
-| `production-safe` | Production read-only; no authentication changes | Eligible for Jev review |
-| `strict` | Production read-only; no authentication changes; strict execution | Blocked |
-
-Packs are additive: `production-read-only`, `no-auth-changes`, `strict-execution`,
-and `protected-paths`. The baseline always applies. These packs are optional; ordinary users can stay with
-plain-language rules and examples. Advanced add-ons can deny
-specific tools, command prefixes and paths, and add Jev instructions. There are no
-allow overrides: any fixed denial wins, even if Jev would approve.
-
-General development trades strict execution restrictions for usability. Allowing a
-script does not prove that everything it does is safe. It is not a syscall sandbox.
-Existing version-1 installations retain their strict behavior and policy unchanged.
-
-## Install
-
-Requirements: macOS or Linux, Python **3.10+**, one of the supported CLIs, and a
-[TypeSafe API key](https://console.typesafe.ai). No third-party Python packages.
-Windows and remote/cloud agent environments are not supported by this installer.
-
-Clone this repository and enter its directory. For a private repository, other
-people first need repository access.
+## Test
 
 ```sh
-# Run the offline tests.
+# Offline validation; no API key required.
 python3 -m unittest discover -v
 
-# Preview which installed CLIs would be configured.
-python3 install_multi.py --dry-run
-
-# Install for detected CLIs, or select them explicitly:
-python3 install_multi.py --clients codex claude devin --preset general-development
-
-# Enter the key privately; it is not displayed or put in command history.
-python3 ~/.codex/guards/jev/set_key.py
+# Live checks through an isolated copy of the hook; uses your Jev API key.
+python3 smoke_test.py --extended
 ```
 
-The installer preserves unrelated settings/hooks, backs up modified files, and
-copies the runtime outside the cloned repository to `~/.codex/guards/jev/`.
-It works on a fresh machine; no previous guard installation is required.
-The key remains in an owner-only file. Alternatively, supply `TYPESAFE_API_KEY`
-to the agent's environment. GUI applications may not inherit terminal variables.
+The live test submits twelve proposals but **never executes them**. It prints a result
+for each case and exits nonzero if any expectation fails. A service outage does not
+count as a successful dangerous-action rejection.
 
-**Activation is a separate step:** restart/reload the agents. In Codex, review and
-trust the new hook using `/hooks`; untrusted hooks are skipped. Use `/hooks` in
-Claude and Devin to inspect loaded hooks. The installer cannot prove that a running
-agent has reloaded its configuration. Until activation is verified, do not assume
-the guard is protecting that session. A loaded guard without a working key blocks
-all otherwise-eligible calls.
+This tests the hook subprocess, not whether your agent loads it. To check actual
+interception, use a disposable workspace, add a temporary natural-language rule that
+forbids creating one harmless filename, then ask the agent to create that file and a
+permitted file separately. Check for an actual hook rejection; the agent declining
+on its own is not evidence. Never use real destructive operations as live probes.
 
-cmux needs no separate hook: the agents inside it load the above user settings.
-Commands you type manually in the terminal are unaffected.
+See [EVALUATION.md](EVALUATION.md) for recorded results and the known harmless-read
+false positive. The tests do not establish a security error rate.
 
-## Advanced: policy packs and deterministic add-ons
+## What is inspected and sent to Jev
 
-Edit the **installed** `~/.codex/guards/jev/policy.json` in your own editor:
+Eligible requests send the policy, tool arguments, working directory and collected
+context to TypeSafe. Arguments may already contain private source or patch text.
+The guard inspects up to three local entrypoint scripts, 32 KiB each, and sends their
+contents and hashes. Sensitive-looking, missing, oversized and outside-workspace
+scripts block before contacting Jev.
 
-```json
-{
-  "preset": "general-development",
-  "packs": ["production-read-only", "no-auth-changes", "protected-paths"],
-  "production_identifiers": ["company-prod-project", "db.production.example.com"],
-  "production_paths": ["/srv/production-data"],
-  "protected_paths": [{"path": "/srv/customer-data", "access": "read-only"}],
-  "addons": [{
-    "name": "team-publishing",
-    "instructions": "Never publish packages or push repository changes.",
-    "deny_command_prefixes": [["git", "push"], ["npm", "publish"]],
-    "deny_tools": ["mcp__deployment__publish"]
-  }]
-}
-```
+Literal Python `Path(...).read_text()` / `read_bytes()` candidates may contribute
+path metadata. Up to twelve small ordinary local targets can also be scanned locally
+for known secret patterns; only scan flags and metadata are sent, never target data.
+The scanner excludes sensitive paths, symlinks and nonregular or oversized targets.
+It does not detect every secret or fully analyze Python behavior.
 
-Merge these fields into the installed version-2 policy; do not replace the entire file.
-Complete configurations are in [examples](examples). Only enabled packs contribute pack-specific Jev questions and restrictions. Written
-rules and examples contribute their own questions regardless of the chosen preset. Protected paths also apply when specified directly or
-inside an add-on: `read-only` denies writes, while `deny` denies reads and writes.
-Overlapping path rules take the most restrictive result. Paths must be absolute or
-start with `~/`. Command prefixes are arrays of literal command/argument tokens;
-no executable plugin or arbitrary regex is loaded. Fixed matching is best-effort,
-not a complete shell parser. Unknown fields/packs and invalid values are rejected.
+Imports, shell startup files, runtime inputs and subprocess dependencies are not
+fully resolved. Package/build/container launchers such as `npm test` currently block
+because the guard cannot inspect their dependency execution. Other opaque behavior
+still relies on Jev recognizing uncertainty. See [SECURITY.md](SECURITY.md).
 
-For a fresh installation, select presets/packs on the command line:
+Transient API errors get at most one retry sharing the existing API budget. There is
+no retry of a policy decision to seek approval. Errors distinguish HTTP status,
+network/timeout, key, response validation and policy-score failures without logging
+raw API bodies or credentials. API usage is billed to your TypeSafe account.
+
+## Update or uninstall
+
+For an existing **version-3 policy**, pull the repository and rerun the installer with
+the same clients. Your policy and key are preserved. Restart/review hooks afterward.
+
+**Older version-1/2 installations are not automatically migrated.** The installer
+stops before changing any files. Their installed runtime continues to work unchanged.
+Before updating one, back up its guard directory and client configurations, explicitly
+review the current [policy.json](policy.json), carry custom requirements into rules
+and examples, and replace the installed policy with that reviewed version-3 policy.
+Then rerun the installer. Changing only the version number is not a migration.
+Previous implementations remain available in Git history, not the current runtime.
 
 ```sh
-python3 install_multi.py --clients claude --preset production-safe
-python3 install_multi.py --clients codex --preset general-development --pack no-auth-changes
-python3 install_multi.py --clients devin --preset strict
+python3 install_multi.py --uninstall --clients codex --dry-run
+python3 install_multi.py --uninstall --clients codex
 ```
 
-Existing policies are preserved **byte-for-byte**, including session scope and key
-location. The installer refuses preset/pack flags when a policy already exists;
-change that policy explicitly in your editor instead. Version 1 remains supported
-with its original strict semantics. To adopt version 2 deliberately, start from a
-complete example and retain your key location, session IDs and production targets.
-
-An empty `session_ids` array means all local sessions. Production targets are enforced
-when `production-read-only` is enabled; that pack also conservatively blocks unknown
-remote mutations. User instructions in add-ons cannot override fixed prohibitions.
-
-New machine-safety and general-development installations start at allow probability 0.95 and confidence
-0.90 for every question. The installer uses 0.99 allow probability when selecting
-production-safe or strict; their complete examples also use 0.99. Edit these fields
-explicitly to customize them. These are starting values, **not calibrated security error rates**.
-
-## What leaves your machine
-
-Eligible calls send their tool name, proposed arguments, working directory and policy
-to `https://api.typesafe.ai/v1/systemone`. Arguments may contain source/patch text or
-other private information. With `inspect_scripts: true` (the new default), the guard
-reads and sends up to three local entrypoint scripts, at most 32 KiB each, with their
-hashes. It rejects missing, oversized, sensitive-looking and outside-workspace scripts
-before contacting Jev. It does not read chat transcripts. Basic secret-pattern detection blocks some obvious credentials;
-it cannot identify every secret. There is no raw-command audit log or decision cache.
-Jev requests incur your account's API usage.
-
-## Update and uninstall
-
-After updating your clone, rerun the installer with the same client selection.
-Review changed hooks and restart clients again as needed. Backups and a file-hash
-manifest live under the installed guard directory.
-
-```sh
-python3 install_multi.py --uninstall --clients codex claude devin --dry-run
-python3 install_multi.py --uninstall --clients codex claude devin
-```
-
-Uninstall removes only this guard's configured handlers, preserving unrelated
-hooks. It deliberately retains the guard directory, API key and backups for manual
-cleanup. Restart the agents after uninstalling.
-
-## How it works
-
-`PreToolUse → normalize tool input → fixed rules → Jev → deny or defer`
-
-The handler never executes the proposed command. A denial exits 2 with a reason on
-stderr. Passing exits 0 without an explicit approval, preserving the client's own
-permission/sandbox checks. Missing/invalid input and handled failures deny. The
-launcher converts startup failure to a blocking exit, but a client that skips a
-hook or ignores its timeout can still bypass this layer.
-
-See [integration details](INTEGRATIONS.md) and [security limitations](SECURITY.md).
-The tests simulate dangerous actions; they never execute them. They validate rules,
-adapters and installers, not complete enforcement by every agent version.
-
-Sources: [TypeSafe API](https://docs.typesafe.ai/api),
-[Codex hooks](https://learn.chatgpt.com/docs/hooks),
-[Claude hooks](https://code.claude.com/docs/en/hooks),
-[Devin hooks](https://docs.devin.ai/cli/extensibility/hooks/overview).
-
-## Machine-safety inspection limits
-
-The default judges effects from rules and examples, with a small fixed emergency
-baseline. You do not need to enumerate every dangerous command. The source collector
-recognizes common interpreters; its command dispatch is implementation plumbing,
-not your safety policy.
-
-Only entrypoint source is inspected. Imports, shell startup files, PATH replacements,
-runtime inputs and subprocess dependencies are not resolved or attested. Package,
-build and container launchers currently block before Jev because their dependencies
-cannot be inspected; this includes `npm test`. This conservative first version is
-not yet transparent for every development workflow. Other opaque commands still
-depend on Jev recognizing insufficient context; no model can guarantee that.
-
-The hook cannot prevent a permitted process from performing unobserved operations,
-and files can change between checking and execution. Keep OS sandboxing and native
-agent permissions enabled. Existing installed policies are preserved during updates;
-the machine-safety default applies to fresh installs.
-
-## Try the hook safely
-
-Run `python3 smoke_test.py` after configuring your key. It calls Jev through an
-isolated copy of the hook and prints pass/fail for five proposals; it never runs
-those commands. It does not prove that your agent is loading the hook.
-
-**Current status:** 59 offline tests pass. The latest live extended run matched 11/12
-expectations, including all five original smoke cases. A harmless Python file read
-still over-blocked; an earlier run encountered HTTP 529 from Jev. This remains an
-experimental gate. See [EVALUATION.md](EVALUATION.md) for the full results.
-
-Use `python3 smoke_test.py --extended` for additional source and outcome variations.
-Service failures do not count as successful dangerous-action rejections. Hook errors
-now distinguish missing/invalid keys, HTTP status, timeout, network and response
-validation failures. Policy rejections show the evaluated rule, choice, allow score,
-confidence and required thresholds. No raw API response or exception text is logged.
-
-## Transient errors and local read context
-
-The API client makes at most two attempts for HTTP 429/500/502/503/504/529,
-timeouts and connection failures represented as transient transport errors. Attempts
-share the configured API time budget; retry delay starts at 0.2 seconds. A numeric
-Retry-After is honored only when it fits the remaining budget. Authentication errors,
-invalid responses and policy judgments are never retried. Exhaustion still blocks.
-
-For literal `Path("...").read_text()` / `read_bytes()` candidates in Python source,
-the collector supplies path locality and file metadata. Up to 12 small ordinary
-regular local targets (32 KiB each) can also be scanned locally for known secret
-patterns. Their contents are never uploaded; only metadata and scan flags are sent.
-Sensitive paths, symlinks, oversized and nonregular targets are not scanned. This
-is limited syntactic inspection, not complete Python analysis or proof that data
-is non-sensitive. Rebound names and source behavior still require Jev review.
-
-The latest local-read fixture still blocked at allow probability 0.94 (required 0.95),
-with confidence 0.91. Better context improved its scores but has not eliminated this
-false positive. Thresholds remain unchanged.
+Uninstall removes only this guard's hooks. It retains the runtime, key and backups;
+restart the client afterward. Remote/cloud agent environments and Windows are not
+supported by this installer.

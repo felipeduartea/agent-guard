@@ -20,7 +20,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_native_tool_names(self):
         for name in ('Bash','exec','exec_command'):
-            e=event('gcloud auth login',tool_name=name)
+            e=event('rm -rf /System',tool_name=name)
             self.assertEqual(hook.evaluate_hook(e,POLICY,self.engine())['hookSpecificOutput']['permissionDecision'],'deny')
         for name in ('Edit','Write','edit','write'):
             e=event(tool_name=name,tool_input={'path':'/etc/passwd','content':'unsafe'})
@@ -63,7 +63,7 @@ class AdapterTests(unittest.TestCase):
 class MultiInstallTests(unittest.TestCase):
     def prepare(self,home):
         root=home/'.codex/guards/jev';root.mkdir(parents=True)
-        p=copy.deepcopy(POLICY);p['session_ids']=['old-session'];p['production_identifiers']=['keep-me']
+        p=copy.deepcopy(POLICY);p['session_ids']=['old-session'];p['rules'].append('Keep team data private.')
         (root/'policy.json').write_text(json.dumps(p))
         (root/'typesafe.key').write_text('sentinel-not-real')
         original={}
@@ -77,7 +77,9 @@ class MultiInstallTests(unittest.TestCase):
     def test_install_preserve_and_idempotence(self):
         with tempfile.TemporaryDirectory() as td:
             home=Path(td);root,original=self.prepare(home)
+            policy_bytes=(root/'policy.json').read_bytes()
             manifest=install_multi.install(home)
+            self.assertEqual((root/'policy.json').read_bytes(),policy_bytes)
             for client,relative in install_multi.CONFIGS.items():
                 d=json.loads((home/relative).read_text())
                 self.assertEqual(d['other'],'preserve')
@@ -85,7 +87,7 @@ class MultiInstallTests(unittest.TestCase):
                 self.assertEqual(len(d['hooks']['PreToolUse']),2)
             policy=json.loads((root/'policy.json').read_text())
             self.assertEqual(policy['session_ids'],['old-session'])
-            self.assertEqual(policy['production_identifiers'],['keep-me'])
+            self.assertIn('Keep team data private.',policy['rules'])
             self.assertEqual((root/'typesafe.key').read_text(),'sentinel-not-real')
             self.assertEqual(len(list(Path(manifest['backup']).glob('*key*'))),0)
             install_multi.install(home)

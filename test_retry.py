@@ -45,7 +45,7 @@ class RetryTests(unittest.TestCase):
             sleep.assert_not_called()
 
     def test_invalid_json_and_denials_do_not_retry(self):
-        r=good_response();r['answers']['production']['choice']='deny'
+        r=good_response();r['answers']['baseline']['choice']='deny'
         for body in [b'not-json',json.dumps(r).encode()]:
             _,op,sleep=self.run_request([self.response(body)])
             self.assertEqual(op.call_count,1)

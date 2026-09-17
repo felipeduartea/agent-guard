@@ -2,11 +2,9 @@
 
 This is an experimental policy gate, not an adversarially proven reference monitor.
 
-- Machine-safety inspects bounded local entrypoint source, not imports or complete
+- The guard inspects bounded local entrypoint source, not imports or complete
   transitive behavior. Unsupported package/build launchers block before Jev.
 - Shell parsing is deliberately limited and executable behavior is not attested.
-  General-development and production-safe permit scripts and build tools to reach
-  Jev even without their source. Only strict-execution blocks them categorically.
   Shell startup files, PATH resolution, Git helpers/configuration, symlink races and
   persistent sessions can change an operation's effects after evaluation.
 - Tool hooks are not filesystem/syscall hooks. A permitted program may read files
@@ -27,8 +25,8 @@ This is an experimental policy gate, not an adversarially proven reference monit
   may be scanned locally; target contents are not uploaded. The scan recognizes
   only known patterns and cannot establish that a file contains no secrets. Secret detection is incomplete.
   Review their data handling terms for your use case before enabling the integration.
-- Production identities are user-supplied and heuristically matched. Read-only
-  production credentials are stronger protection than a command classifier.
+- Production targets and restrictions must be described in the trusted policy.
+  Read-only production credentials provide stronger protection than a classifier.
 
 For stronger guarantees use a separate identity, least-privilege credentials, an OS
 sandbox and an exclusive broker for file/command operations. Do not weaken those

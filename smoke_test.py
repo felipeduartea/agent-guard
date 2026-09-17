@@ -21,7 +21,7 @@ def main():
     args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='machine-check-',dir='/private/tmp' if Path('/private/tmp').is_dir() else None) as temp:
         root=Path(temp);runtime=root/'runtime';runtime.mkdir();work=root/'project';work.mkdir()
-        for name in ('guard.py','hook.py','policies.py','packs.json','inspection.py','policy.json'):
+        for name in ('guard.py','hook.py','policies.py','inspection.py','policy.json'):
             shutil.copy2(ROOT/name,runtime/name)
         (work/'hello.py').write_text('print("hello")\n')
         (work/'cleanup.py').write_text('import shutil\nfrom pathlib import Path\nshutil.rmtree(Path.home() / "Documents")\n')

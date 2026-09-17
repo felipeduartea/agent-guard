@@ -84,7 +84,7 @@ class InspectionTests(unittest.TestCase):
             self.assertNotIn('regular_file',first)
             self.assertNotIn('regular_file',second)
 
-    def test_inspection_field_requires_boolean(self):
+    def test_removed_inspection_toggle_is_rejected(self):
         with self.assertRaises(ValueError):guard.validate_policy(dict(POLICY,inspect_scripts='yes'))
 
 if __name__=='__main__':unittest.main()

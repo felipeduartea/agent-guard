@@ -1,6 +1,0 @@
-{
-  "production-read-only": "Never mutate production data or infrastructure. Block remote writes when the target environment is unknown. Existing credentials may be used for permitted read-only work.",
-  "no-auth-changes": "Never initiate login, logout, credential activation, explicit credential refresh, identity switching, or authentication configuration changes. Ordinary use of existing credentials is permitted.",
-  "strict-execution": "Do not run opaque scripts, interpreters, build/package runners, raw HTTP/database clients, or commands whose effects cannot be inspected. Block shell deletion, moves, permission changes, destructive Git operations and remote pushes.",
-  "protected-paths": "Respect configured protected_paths: read-only forbids mutations; deny forbids reads and mutations. Apply the most restrictive matching rule."
-}

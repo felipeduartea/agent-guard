@@ -12,7 +12,6 @@ import shutil
 import sys
 import tempfile
 import guard
-from policies import PRESETS
 
 SOURCE = Path(__file__).resolve().parent
 CONFIGS = { 'codex':'.codex/hooks.json', 'claude':'.claude/settings.json',
@@ -54,7 +53,7 @@ def merge_config(existing, root):
     d['hooks']['PreToolUse']=new
     return d
 
-def install(home, clients=None, dry_run=False, preset=None, packs=None):
+def install(home, clients=None, dry_run=False):
     clients=list(CONFIGS) if clients is None else list(dict.fromkeys(clients))
     if not clients or any(c not in CONFIGS for c in clients):
         raise ValueError('Select at least one supported client.')
@@ -62,13 +61,6 @@ def install(home, clients=None, dry_run=False, preset=None, packs=None):
     if root.is_symlink(): raise RuntimeError('Symlink guard directory')
     policy_path=root/'policy.json'
     policy=json.loads((policy_path if policy_path.exists() else SOURCE/'policy.json').read_text())
-    if policy_path.exists() and (preset is not None or packs):
-        raise ValueError('Existing policy is preserved. Edit it explicitly in your own editor to change presets/packs.')
-    if preset is not None:
-        policy['preset']=preset
-        policy['minimum_allow_probability']=0.95 if preset in ('machine-safety','general-development') else 0.99
-        policy['inspect_scripts']=preset=='machine-safety'
-    if packs: policy['packs']=packs
     guard.validate_policy(policy)
     key=policy['key_file']
     plan={}
@@ -80,12 +72,12 @@ def install(home, clients=None, dry_run=False, preset=None, packs=None):
         content=json.loads(original) if original is not None else {}
         plan[client]=(path,original,merge_config(content,root))
     if dry_run:
-        return {'dry_run':True,'scope':policy['session_ids'] or 'all local sessions','policy_preserved':policy_path.exists(),'preset':policy.get('preset','legacy-strict'),'configs':{c:str(p[0]) for c,p in plan.items()},
+        return {'dry_run':True,'scope':policy['session_ids'] or 'all local sessions','policy_preserved':policy_path.exists(),'configs':{c:str(p[0]) for c,p in plan.items()},
                 'guard_directory':str(root),'key_value':'never read by installer'}
     stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     backup=root/'backups'/stamp
     backup.mkdir(parents=True,mode=0o700)
-    names=('guard.py','hook.py','policies.py','inspection.py','packs.json','set_key.py','README.md','INTEGRATIONS.md')
+    names=('guard.py','hook.py','policies.py','inspection.py','set_key.py','README.md','INTEGRATIONS.md')
     for name in (*names,'policy.json','installation.json'):
         if (root/name).exists(): shutil.copy2(root/name,backup/name)
     for client,(path,original,_) in plan.items():
@@ -143,14 +135,14 @@ def main():
     parser.add_argument('--clients',nargs='+',choices=list(CONFIGS),help='Clients to configure; default: detected installed CLIs.')
     parser.add_argument('--dry-run',action='store_true',help='Show changes without writing files or reading the API key.')
     parser.add_argument('--uninstall',action='store_true',help='Remove only this guard\'s hooks; keep files and key.')
-    parser.add_argument('--preset',choices=list(PRESETS),help='Fresh installs only; default: machine-safety.')
-    parser.add_argument('--pack',action='append',default=[],help='Fresh installs only; add a built-in pack (repeatable).')
     args=parser.parse_args()
     if os.name!='posix':parser.error('Only macOS and Linux are supported.')
     clients=args.clients or [c for c,b in [('codex','codex'),('claude','claude'),('devin','devin')] if shutil.which(b)]
     if not clients:parser.error('No supported CLI detected; specify --clients explicitly.')
-    if args.uninstall and (args.preset or args.pack):parser.error('Preset/pack options cannot be used with uninstall.')
-    output=uninstall(Path.home(),clients,args.dry_run) if args.uninstall else install(Path.home(),clients,args.dry_run,args.preset,args.pack)
+    try:
+        output=uninstall(Path.home(),clients,args.dry_run) if args.uninstall else install(Path.home(),clients,args.dry_run)
+    except (ValueError,RuntimeError) as exc:
+        parser.error(str(exc))
     print(json.dumps(output,indent=2))
 
 if __name__=='__main__': main()
