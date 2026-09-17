@@ -2,6 +2,8 @@
 
 This is an experimental policy gate, not an adversarially proven reference monitor.
 
+- Machine-safety inspects bounded local entrypoint source, not imports or complete
+  transitive behavior. Unsupported package/build launchers block before Jev.
 - Shell parsing is deliberately limited and executable behavior is not attested.
   General-development and production-safe permit scripts and build tools to reach
   Jev even without their source. Only strict-execution blocks them categorically.
@@ -20,7 +22,7 @@ This is an experimental policy gate, not an adversarially proven reference monit
   or proceed after engine-level errors/timeouts. Keep platform safeguards enabled.
 - The guard and policy are owned by the same OS user as the agents. The fixed path
   protections are best-effort; they do not make the files tamperproof.
-- Proposed tool arguments are sent to TypeSafe. Secret detection is incomplete.
+- Proposed tool arguments and inspected entrypoint source are sent to TypeSafe. Secret detection is incomplete.
   Review their data handling terms for your use case before enabling the integration.
 - Production identities are user-supplied and heuristically matched. Read-only
   production credentials are stronger protection than a command classifier.

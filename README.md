@@ -42,7 +42,7 @@ must pass the configured thresholds. An allowed example never overrides a prohib
 conflicting interpretations are blocked or marked uncertain. Exactly identical allowed
 and blocked examples are rejected during configuration validation.
 
-The fresh-install default includes general development examples and basic protections.
+The fresh-install default protects personal files, system security and credentials, blocks login/account changes and production writes, and permits bounded local development. Customize its outcome rules and examples without maintaining a command list.
 The production/authentication restrictions above are **optional**, not silently enabled
 for everyone. [outcomes-only.json](examples/outcomes-only.json) is a complete example of
 that policy with no command denylist or fixed production/authentication pack.
@@ -58,13 +58,14 @@ they do not eliminate false positives or prove enforcement accuracy.
 
 ## Optional presets and deterministic restrictions
 
-New installations default to **general-development**. Every preset includes a baseline
+New installations default to **machine-safety**, using outcome rules and examples plus bounded local script inspection. Every preset includes a baseline
 against system destruction, credential exposure and guard tampering. Passing fixed checks
 still requires Jev evaluation and the agent's normal permissions.
 
 | Preset | Optional restrictions included | Ordinary Python/npm/make |
 | --- | --- | --- |
-| `general-development` (default) | None | Eligible for Jev review |
+| `machine-safety` (default) | None | Inspected entrypoint scripts eligible; unresolved build/package execution blocked |
+| `general-development` | None | Eligible for Jev review without source inspection |
 | `production-safe` | Production read-only; no authentication changes | Eligible for Jev review |
 | `strict` | Production read-only; no authentication changes; strict execution | Blocked |
 
@@ -164,7 +165,7 @@ An empty `session_ids` array means all local sessions. Production targets are en
 when `production-read-only` is enabled; that pack also conservatively blocks unknown
 remote mutations. User instructions in add-ons cannot override fixed prohibitions.
 
-New general-development installations start at allow probability 0.95 and confidence
+New machine-safety and general-development installations start at allow probability 0.95 and confidence
 0.90 for every question. The installer uses 0.99 allow probability when selecting
 production-safe or strict; their complete examples also use 0.99. Edit these fields
 explicitly to customize them. These are starting values, **not calibrated security error rates**.
@@ -173,8 +174,10 @@ explicitly to customize them. These are starting values, **not calibrated securi
 
 Eligible calls send their tool name, proposed arguments, working directory and policy
 to `https://api.typesafe.ai/v1/systemone`. Arguments may contain source/patch text or
-other private information. The guard does not read target files or chat transcripts
-for evaluation. Basic secret-pattern detection blocks some obvious credentials;
+other private information. With `inspect_scripts: true` (the new default), the guard
+reads and sends up to three local entrypoint scripts, at most 32 KiB each, with their
+hashes. It rejects missing, oversized, sensitive-looking and outside-workspace scripts
+before contacting Jev. It does not read chat transcripts. Basic secret-pattern detection blocks some obvious credentials;
 it cannot identify every secret. There is no raw-command audit log or decision cache.
 Jev requests incur your account's API usage.
 
@@ -211,3 +214,33 @@ Sources: [TypeSafe API](https://docs.typesafe.ai/api),
 [Codex hooks](https://learn.chatgpt.com/docs/hooks),
 [Claude hooks](https://code.claude.com/docs/en/hooks),
 [Devin hooks](https://docs.devin.ai/cli/extensibility/hooks/overview).
+
+## Machine-safety inspection limits
+
+The default judges effects from rules and examples, with a small fixed emergency
+baseline. You do not need to enumerate every dangerous command. The source collector
+recognizes common interpreters; its command dispatch is implementation plumbing,
+not your safety policy.
+
+Only entrypoint source is inspected. Imports, shell startup files, PATH replacements,
+runtime inputs and subprocess dependencies are not resolved or attested. Package,
+build and container launchers currently block before Jev because their dependencies
+cannot be inspected; this includes `npm test`. This conservative first version is
+not yet transparent for every development workflow. Other opaque commands still
+depend on Jev recognizing insufficient context; no model can guarantee that.
+
+The hook cannot prevent a permitted process from performing unobserved operations,
+and files can change between checking and execution. Keep OS sandboxing and native
+agent permissions enabled. Existing installed policies are preserved during updates;
+the machine-safety default applies to fresh installs.
+
+## Try the hook safely
+
+Run `python3 smoke_test.py` after configuring your key. It calls Jev through an
+isolated copy of the hook and prints pass/fail for five proposals; it never runs
+those commands. It does not prove that your agent is loading the hook.
+
+**Current status:** 43 offline tests pass, but the live smoke test matches only 3/5
+expectations: harmless file creation and a print-only script are over-blocked. The
+new default is experimental and needs further calibration before everyday use. See
+[EVALUATION.md](EVALUATION.md) for results and limitations.

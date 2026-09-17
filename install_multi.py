@@ -66,7 +66,8 @@ def install(home, clients=None, dry_run=False, preset=None, packs=None):
         raise ValueError('Existing policy is preserved. Edit it explicitly in your own editor to change presets/packs.')
     if preset is not None:
         policy['preset']=preset
-        policy['minimum_allow_probability']=0.95 if preset=='general-development' else 0.99
+        policy['minimum_allow_probability']=0.95 if preset in ('machine-safety','general-development') else 0.99
+        policy['inspect_scripts']=preset=='machine-safety'
     if packs: policy['packs']=packs
     guard.validate_policy(policy)
     key=policy['key_file']
@@ -84,7 +85,7 @@ def install(home, clients=None, dry_run=False, preset=None, packs=None):
     stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     backup=root/'backups'/stamp
     backup.mkdir(parents=True,mode=0o700)
-    names=('guard.py','hook.py','policies.py','packs.json','set_key.py','README.md','INTEGRATIONS.md')
+    names=('guard.py','hook.py','policies.py','inspection.py','packs.json','set_key.py','README.md','INTEGRATIONS.md')
     for name in (*names,'policy.json','installation.json'):
         if (root/name).exists(): shutil.copy2(root/name,backup/name)
     for client,(path,original,_) in plan.items():
@@ -142,7 +143,7 @@ def main():
     parser.add_argument('--clients',nargs='+',choices=list(CONFIGS),help='Clients to configure; default: detected installed CLIs.')
     parser.add_argument('--dry-run',action='store_true',help='Show changes without writing files or reading the API key.')
     parser.add_argument('--uninstall',action='store_true',help='Remove only this guard\'s hooks; keep files and key.')
-    parser.add_argument('--preset',choices=list(PRESETS),help='Fresh installs only; default: general-development.')
+    parser.add_argument('--preset',choices=list(PRESETS),help='Fresh installs only; default: machine-safety.')
     parser.add_argument('--pack',action='append',default=[],help='Fresh installs only; add a built-in pack (repeatable).')
     args=parser.parse_args()
     if os.name!='posix':parser.error('Only macOS and Linux are supported.')
