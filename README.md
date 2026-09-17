@@ -240,7 +240,13 @@ Run `python3 smoke_test.py` after configuring your key. It calls Jev through an
 isolated copy of the hook and prints pass/fail for five proposals; it never runs
 those commands. It does not prove that your agent is loading the hook.
 
-**Current status:** 43 offline tests pass, but the live smoke test matches only 3/5
-expectations: harmless file creation and a print-only script are over-blocked. The
-new default is experimental and needs further calibration before everyday use. See
-[EVALUATION.md](EVALUATION.md) for results and limitations.
+**Current status:** 50 offline tests pass. The latest live extended run matched 11/12
+expectations, including all five original smoke cases. A harmless Python file read
+still over-blocked; an earlier run encountered HTTP 529 from Jev. This remains an
+experimental gate. See [EVALUATION.md](EVALUATION.md) for the full results.
+
+Use `python3 smoke_test.py --extended` for additional source and outcome variations.
+Service failures do not count as successful dangerous-action rejections. Hook errors
+now distinguish missing/invalid keys, HTTP status, timeout, network and response
+validation failures. Policy rejections show the evaluated rule, choice, allow score,
+confidence and required thresholds. No raw API response or exception text is logged.
