@@ -11,9 +11,9 @@ import shlex
 import shutil
 import sys
 import tempfile
-import guard
-
-SOURCE = Path(__file__).resolve().parent
+SOURCE = Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(SOURCE))
+from runtime import guard
 CONFIGS = { 'codex':'.codex/hooks.json', 'claude':'.claude/settings.json',
             'devin':'.config/devin/config.json' }
 
@@ -60,7 +60,7 @@ def install(home, clients=None, dry_run=False):
     root=home/'.codex/guards/jev'
     if root.is_symlink(): raise RuntimeError('Symlink guard directory')
     policy_path=root/'policy.json'
-    policy=json.loads((policy_path if policy_path.exists() else SOURCE/'policy.json').read_text())
+    policy=json.loads((policy_path if policy_path.exists() else SOURCE/'config/policy.json').read_text())
     guard.validate_policy(policy)
     key=policy['key_file']
     plan={}
@@ -77,14 +77,17 @@ def install(home, clients=None, dry_run=False):
     stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     backup=root/'backups'/stamp
     backup.mkdir(parents=True,mode=0o700)
-    names=('guard.py','hook.py','policies.py','inspection.py','set_key.py','README.md','INTEGRATIONS.md')
+    sources={name:SOURCE/'runtime'/name for name in ('guard.py','hook.py','policies.py','inspection.py')}
+    sources.update({'set_key.py':SOURCE/'scripts/set_key.py',
+                    'README.md':SOURCE/'README.md','INTEGRATIONS.md':SOURCE/'docs/INTEGRATIONS.md'})
+    names=tuple(sources)
     for name in (*names,'policy.json','installation.json'):
         if (root/name).exists(): shutil.copy2(root/name,backup/name)
     for client,(path,original,_) in plan.items():
         if original is not None: write_atomic(backup/(client+'.json'),original)
     completed=[]
     try:
-        for name in names: write_atomic(root/name,(SOURCE/name).read_bytes())
+        for name in names: write_atomic(root/name,sources[name].read_bytes())
         if not policy_path.exists():
             write_atomic(policy_path,(json.dumps(policy,indent=2)+'\n').encode())
         for client,(path,original,merged) in plan.items():

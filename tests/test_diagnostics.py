@@ -1,9 +1,9 @@
 import unittest
 import urllib.error
-import guard
-import smoke_test
+from runtime import guard
+from scripts import smoke_test
 from types import SimpleNamespace
-from test_guard import event, POLICY, good_response
+from .test_guard import event, POLICY, good_response
 
 class DiagnosticTests(unittest.TestCase):
     def reason(self,query,key=lambda _: 'fake'):

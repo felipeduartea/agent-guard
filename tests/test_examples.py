@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 import unittest
 from unittest.mock import Mock,patch
-import guard
-from test_guard import event
-from test_policies import config
+from runtime import guard
+from .test_guard import event
+from .test_policies import config
 
 class ExamplePolicyTests(unittest.TestCase):
     def policy(self):

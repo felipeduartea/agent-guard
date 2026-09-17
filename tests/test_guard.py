@@ -4,9 +4,9 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock,patch
-import guard
+from runtime import guard
 
-POLICY=json.loads((Path(__file__).parent/'policy.json').read_text())
+POLICY=json.loads((Path(__file__).resolve().parents[1]/'config/policy.json').read_text())
 
 def event(command='pwd',**updates):
     e={'session_id':'test-session','hook_event_name':'PreToolUse','tool_name':'Bash',

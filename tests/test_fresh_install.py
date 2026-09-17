@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import install_multi
+from scripts import install_multi
 
 class FreshInstallTests(unittest.TestCase):
     def test_fresh_machine_selected_client(self):

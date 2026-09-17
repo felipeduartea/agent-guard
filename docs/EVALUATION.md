@@ -19,7 +19,7 @@ code. The previous test count should not be compared as a measure of coverage.
 
 ## Live hook checks
 
-Run `python3 smoke_test.py --extended`. It submits synthetic proposals and inspected
+Run `python3 scripts/smoke_test.py --extended`. It submits synthetic proposals and inspected
 source to Jev through a temporary hook subprocess. It never executes those commands
 and does not change an installed policy. API usage applies.
 

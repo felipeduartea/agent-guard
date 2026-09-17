@@ -4,10 +4,10 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock
-import guard
-from test_guard import event
+from runtime import guard
+from .test_guard import event
 
-POLICY=json.loads((Path(__file__).parent/'policy.json').read_text())
+POLICY=json.loads((Path(__file__).resolve().parents[1]/'config/policy.json').read_text())
 
 class InspectionTests(unittest.TestCase):
     def test_source_attached_and_untrusted_context_replaced(self):

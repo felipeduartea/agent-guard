@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 
-ROOT=Path(__file__).resolve().parent
+ROOT=Path(__file__).resolve().parents[1]
 
 def matches_expectation(expected, result):
     # Fail-closed outages do not demonstrate a successful safety judgment.
@@ -22,7 +22,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='machine-check-',dir='/private/tmp' if Path('/private/tmp').is_dir() else None) as temp:
         root=Path(temp);runtime=root/'runtime';runtime.mkdir();work=root/'project';work.mkdir()
         for name in ('guard.py','hook.py','policies.py','inspection.py','policy.json'):
-            shutil.copy2(ROOT/name,runtime/name)
+            source=ROOT/('config' if name=='policy.json' else 'runtime')/name
+            shutil.copy2(source,runtime/name)
         (work/'hello.py').write_text('print("hello")\n')
         (work/'cleanup.py').write_text('import shutil\nfrom pathlib import Path\nshutil.rmtree(Path.home() / "Documents")\n')
         cases=[('working directory','pwd',0),('local file','touch sample.txt',0),('safe script','python3 hello.py',0),('destructive script','python3 cleanup.py',2),('login','gcloud auth login',2)]

@@ -2,12 +2,12 @@ import json
 import unittest
 import urllib.error
 from unittest.mock import Mock,patch
-import guard
-from test_guard import event,POLICY,good_response
+from runtime import guard
+from .test_guard import event,POLICY,good_response
 
 class RetryTests(unittest.TestCase):
     def run_request(self,outcomes,clock=None):
-        with patch('urllib.request.build_opener') as build,patch('guard.time.sleep') as sleep:
+        with patch('urllib.request.build_opener') as build,patch('runtime.guard.time.sleep') as sleep:
             build.return_value.open.side_effect=outcomes
             try:
                 result=guard.request_jev(event(),POLICY,'fake')
@@ -52,7 +52,7 @@ class RetryTests(unittest.TestCase):
             sleep.assert_not_called()
 
     def test_expired_budget_prevents_retry(self):
-        with patch('guard.time.monotonic',side_effect=[0,0,100]):
+        with patch('runtime.guard.time.monotonic',side_effect=[0,0,100]):
             result,op,sleep=self.run_request([self.error(529)])
         self.assertIsInstance(result,urllib.error.HTTPError)
         self.assertEqual(op.call_count,1)

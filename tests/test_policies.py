@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-import guard
-import install_multi
-from test_guard import POLICY
+from runtime import guard
+from scripts import install_multi
+from .test_guard import POLICY
 
 def config(**values):
     p=copy.deepcopy(POLICY);p['rules']=[];p['examples']={};p.update(values);return p

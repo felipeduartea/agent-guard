@@ -8,10 +8,10 @@ import tempfile
 import types
 import unittest
 from unittest.mock import patch
-import guard
-import hook
-import install_multi
-from test_guard import POLICY, event, good_response
+from runtime import guard
+from runtime import hook
+from scripts import install_multi
+from .test_guard import POLICY, event, good_response
 
 class AdapterTests(unittest.TestCase):
     def engine(self):
@@ -44,11 +44,15 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual(hook.evaluate_hook(e,POLICY,self.engine())['hookSpecificOutput']['permissionDecision'],'deny')
 
     def test_cli_contract(self):
-        for e in (event('rm -rf /System'),event('rm -rf /System',tool_name='exec'),{}):
-            p=subprocess.run([sys.executable,'-I',str(Path(hook.__file__))],input=json.dumps(e),capture_output=True,text=True)
-            self.assertEqual(p.returncode,2)
-            self.assertEqual(p.stdout,'')
-            self.assertIn('Jev guard:',p.stderr)
+        with tempfile.TemporaryDirectory() as tmp:
+            home=Path(tmp)
+            install_multi.install(home,['codex'])
+            script=home/'.codex/guards/jev/hook.py'
+            for e in (event('rm -rf /System'),event('rm -rf /System',tool_name='exec'),{}):
+                p=subprocess.run([sys.executable,'-I',str(script)],input=json.dumps(e),capture_output=True,text=True)
+                self.assertEqual(p.returncode,2)
+                self.assertEqual(p.stdout,'')
+                self.assertIn('Jev guard:',p.stderr)
 
     def test_passing_output_never_grants_permission(self):
         fake_engine=types.SimpleNamespace(evaluate=lambda e,p:guard.result(True,'passed'))
@@ -56,7 +60,7 @@ class AdapterTests(unittest.TestCase):
         stdin=types.SimpleNamespace(buffer=io.BytesIO(json.dumps(event('pwd')).encode()))
         with patch.object(hook.importlib.util,'spec_from_file_location',return_value=spec), \
              patch.object(hook.importlib.util,'module_from_spec',return_value=fake_engine), \
-             patch.object(hook.sys,'stdin',stdin),patch('sys.stdout',new_callable=io.StringIO) as out:
+             patch.object(hook.sys,'stdin',stdin),patch.object(Path,'read_text',return_value=json.dumps(POLICY)),patch('sys.stdout',new_callable=io.StringIO) as out:
             self.assertEqual(hook.main(),0)
             self.assertEqual(out.getvalue(),'')
 
