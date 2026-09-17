@@ -1,4 +1,4 @@
-# Jev Agent Guard
+# Agent Guard
 
 A conservative pre-tool guard for **Codex, Claude Code and Devin CLI**, including
 these agents launched inside **cmux**. It combines fixed rules with TypeSafe's Jev
